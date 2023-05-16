@@ -1,0 +1,1140 @@
+--Query 1--
+
+[
+  {
+    $match: {
+      club: "Barcelona",
+    }
+  },
+  {
+    $sort: {
+      "valor_M€": -1,
+    }
+  },
+  {
+    $group: {
+      _id: "$posicion",
+      cantidad: {
+        $sum: 1,
+      },
+      valorMedio: {
+        $avg: "$valor_M€",
+      },
+      valorMinimo: {
+        $min: "$valor_M€",
+      },
+      nombreMinimo: {
+        $last: "$nombre",
+      },
+      valorMaximo: {
+        $max: "$valor_M€",
+      },
+      nombreMaximo: {
+        $first: "$nombre",
+      }
+    }
+  },
+  {
+    $project: {
+      cantidad: 1,
+      valorMedio: 1,
+      valorMinimo: 1,
+      nombreMinimo: 1,
+      valorMaximo: 1,
+      nombreMaximo: 1,
+      _id: 1,
+    }
+  },
+  {
+    $sort: {
+      _id: 1,
+    }
+  },
+]
+
+
+--Query 2--
+[
+  {
+    $match: {
+      club: "Barcelona",
+    },
+  },
+  {
+    $group: {
+      _id: "$nac",
+      nº_jugadores: {
+        $sum: 1,
+      },
+      nº_canteranos: {
+        $sum: {
+          $cond: {
+            if: {
+              $eq: ["$sit_cantera", "club"],
+            },
+            then: 1,
+            else: 0,
+          },
+        },
+      },
+      canteranos_sub_21: {
+        $sum: {
+          $cond: {
+            if: {
+              $and: [
+                { $eq: ["$sit_cantera", "club"] },
+                { $lt: ["$edad", 21] }
+              ]
+            },
+            then: 1,
+            else: 0,
+          },
+        },
+      },
+    },
+  },
+  {
+    $sort: {
+      nº_jugadores: -1,
+      _id: 1,
+    },
+  },
+]
+
+
+--Query 3--
+[
+  {
+    $group: {
+      _id: "$club",
+      avg_edad: {
+        $avg: "$edad",
+      },
+      nº_sub21: {
+        $sum: {
+          $cond: {
+            if: {
+              $lte: ["$edad", 21],
+            },
+            then: 1,
+            else: 0,
+          }
+        }
+      },
+      nº_mas30: {
+        $sum: {
+          $cond: {
+            if: {
+              $gt: ["$edad", 30],
+            },
+            then: 1,
+            else: 0,
+          }
+        }
+      }
+    }
+  },
+  {
+    $sort: {
+      avg_edad: 1,
+    }
+  }
+]
+
+
+--Query 4--
+[
+  {
+    $match: {
+      club: "Barcelona",
+      posicion: "1Portero"
+    }
+  },
+  {
+    $group: {
+      _id: "$club",
+    	G: {
+      	$sum: "$ganado"
+  		},
+      E: {
+        $sum: "$x"
+      },
+      P: {
+        $sum: "$perdido"
+      },
+      GF: {
+        $sum: "$gleq"
+      },
+      GC: {
+        $sum: "$eneq"
+      },
+    }
+  }
+]
+
+--Query 5--
+[
+  {
+    $match: {
+      club: "Barcelona",
+    }
+  },
+  {
+    $sort: {
+      min: -1,
+    }
+  },
+  {
+    $limit: 11,
+  },
+  {
+    $project: {
+      _id: 0,
+      posicion: 1,
+      nombre: 1,
+      edad: 1,
+      nac: 1,
+      min: 1,
+      media: 1,
+      gol: 1,
+      asis: 1,
+      ama: 1,
+      roj: 1,
+    }
+  },
+  {
+    $sort: {
+      posicion: 1,
+    }
+  }
+]
+
+--Query 6--
+[
+  {
+    $match: {
+      club: "Barcelona",
+      min: {
+        $gt: 1800,
+      }
+    }
+  },
+  {
+    $sort: {
+      media: -1,
+    }
+  },
+  {
+    $group: {
+      _id: "$posicion",
+      maxMedia: {
+        $first: "$media",
+      },
+      jugadores: {
+        $push: {
+          nombre: "$nombre",
+          edad: "$edad",
+          nacionalidad: "$nac",
+          minutos: "$min",
+          media: "$media",
+          gol: "$gol",
+          asis: "$asis",
+          ama: "$ama",
+          roj: "$roj"
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      _id: 1,
+      jugadores: {
+        $cond: {
+          if: { $eq: [{ $size: "$jugadores" }, 1] },
+          then: "$jugadores",
+          else: {
+            $filter: {
+              input: "$jugadores",
+              cond: { $eq: ["$$this.media", "$maxMedia"] }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    $sort: {
+      _id: 1,
+    }
+  }
+]
+
+
+--Query 7--
+[
+  {
+    $match: {
+      club: "Barcelona",
+    },
+  },
+  {
+    $group: {
+      _id: "$club",
+      MaxGoleador: {
+        $max: "$gol",
+      },
+      MaxAsistente: {
+        $max: "$asis",
+      },
+      MaxMedia: {
+        $max: "$media",
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "datasetfm22",
+      let: {
+        maxGol: "$MaxGoleador",
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $eq: ["$gol", "$$maxGol"],
+            },
+            club: "Barcelona",
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            nombre: 1,
+          },
+        },
+      ],
+      as: "MaxGoleadorNombre",
+    },
+  },
+  {
+    $lookup: {
+      from: "datasetfm22",
+      let: {
+        maxAsis: "$MaxAsistente",
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $eq: ["$asis", "$$maxAsis"],
+            },
+            club: "Barcelona",
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            nombre: 1,
+          },
+        },
+      ],
+      as: "MaxAsistenteNombre",
+    },
+  },
+  {
+    $lookup: {
+      from: "datasetfm22",
+      let: {
+        maxMedia: "$MaxMedia",
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $eq: ["$media", "$$maxMedia"],
+            },
+            club: "Barcelona",
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            nombre: 1,
+          },
+        },
+      ],
+      as: "MaxMediaNombre",
+    },
+  },
+  {
+    $project: {
+      _id: 1,
+      MaxGoleador: 1,
+      MaxGoleadorNombre: {
+        $arrayElemAt: [
+          "$MaxGoleadorNombre.nombre",
+          0,
+        ],
+      },
+      MaxAsistente: 1,
+      MaxAsistenteNombre: {
+        $arrayElemAt: [
+          "$MaxAsistenteNombre.nombre",
+          0,
+        ],
+      },
+      MaxMedia: 1,
+      MaxMediaNombre: {
+        $arrayElemAt: [
+          "$MaxMediaNombre.nombre",
+          0,
+        ],
+      },
+    },
+  },
+]
+
+
+--Query 8--
+[
+  {
+    $group: {
+      _id: "$club",
+      total_pases_partido: {
+        $sum: {
+          $divide: ["$pas_c", 38],
+        },
+      },
+    },
+  },
+  {
+    $sort: {
+      total_pases_partido: -1,
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      max_pases_partido: {
+        $first: {
+          equipo: "$_id",
+          pases_partido: "$total_pases_partido",
+        },
+      },
+      min_pases_partido: {
+        $last: {
+          equipo: "$_id",
+          pases_partido: "$total_pases_partido",
+        },
+      },
+      Barcelona: {
+        $sum: {
+          $cond: {
+            if: {
+              $eq: ["$_id", "Barcelona"],
+            },
+            then: "$total_pases_partido",
+            else: null,
+          },
+        },
+      },
+      media_liga: {
+        $avg: {
+          $cond: {
+            if: {
+              $ne: ["$_id", "Barcelona"],
+            },
+            then: "$total_pases_partido",
+            else: null,
+          },
+        },
+      },
+    },
+  },
+  {
+    $project: {
+      _id: 0,
+      max_pases_partido: 1,
+      min_pases_partido: 1,
+      media_liga: 1,
+      Barcelona: 1,
+    },
+  },
+]
+
+
+--Query 9--
+[
+  {
+    $match: {
+      club: "Barcelona"
+    }
+  },
+  {
+    $sort: {
+      pas_c: -1,
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      Barcelona_defensa: {
+        $sum: {
+          $cond: {
+            if: { $or: [
+              {$eq: ["$posicion", "3Defensa"]},
+              {$eq: ["$posicion", "1Portero"]},
+              {$eq: ["$posicion", "2Lateral"]},
+            	]
+            },
+            then: {
+              $divide: ["$pas_c",38],
+            },
+            else: null,
+          },
+        },
+      },
+      Barcelona_medio: {
+        $sum: {
+          $cond: {
+            if: { $or: [
+              {$eq: ["$posicion", "4Mediocentro"]},
+              {$eq: ["$posicion", "5Mediapunta"]},
+            	]
+            },
+            then: {
+              $divide: ["$pas_c",38],
+            },
+            else: null,
+          },
+        },
+      },
+      Barcelona_delantera: {
+        $sum: {
+          $cond: {
+            if: { $or: [
+              {$eq: ["$posicion", "6Extremo"]},
+              {$eq: ["$posicion", "7Delantero"]},
+            	]
+            },
+            then: {
+              $divide: ["$pas_c",38],
+            },
+            else: null,
+          },
+        },
+      },
+    },
+  },
+  {
+    $project: {
+      _id: 0,
+      Barcelona_defensa: 1,
+      Barcelona_medio: 1,
+      Barcelona_delantera: 1,
+      Total: {$add: [ "$Barcelona_defensa", "$Barcelona_medio", "$Barcelona_delantera" ] }
+    },
+  },
+]
+
+
+--Query 10--
+[
+  {
+    $sort: {
+      rob: -1,
+    },
+  },
+  {
+  $group: {
+    _id: null,
+    Barcelona_defensa: {
+      $sum: {
+        $cond: {
+          if: {
+            $and: [
+              { $eq: ["$club", "Barcelona"] },
+              {
+                $or: [
+                  { $eq: ["$posicion", "3Defensa"] },
+                  { $eq: ["$posicion", "1Portero"] },
+                  { $eq: ["$posicion", "2Lateral"] }
+                ]
+              }
+            ]
+          },
+          then: { $divide: ["$rob", 38] },
+          else: null
+        }
+      }
+    },
+      Barcelona_medio: {
+      $sum: {
+        $cond: {
+          if: {
+            $and: [
+              { $eq: ["$club", "Barcelona"] },
+              {
+                $or: [
+                  { $eq: ["$posicion", "4Mediocentro"] },
+                  { $eq: ["$posicion", "5Mediapunta"] }
+                ]
+              }
+            ]
+          },
+          then: { $divide: ["$rob", 38] },
+          else: null
+        }
+      }
+    },
+      Barcelona_delantera: {
+      $sum: {
+        $cond: {
+          if: {
+            $and: [
+              { $eq: ["$club", "Barcelona"] },
+              {
+                $or: [
+                  { $eq: ["$posicion", "6Extremo"] },
+                  { $eq: ["$posicion", "7Delantero"] }
+                ]
+              }
+            ]
+          },
+          then: { $divide: ["$rob", 38] },
+          else: null
+        	}
+      	}
+    	},
+    media_liga: {
+        $sum: {
+          $cond: {
+            if: {
+              $ne: ["$club", "Barcelona"],
+            },
+            then: "$rob",
+            else: null,
+          },
+        },
+      },
+    },
+  },
+  {
+    $project: {
+      _id: 0,
+      Barcelona_defensa: 1,
+      Barcelona_medio: 1,
+      Barcelona_delantera: 1,
+      Total: { $add: [ "$Barcelona_defensa", "$Barcelona_medio", "$Barcelona_delantera" ] },
+      Media_liga: {$divide: [
+          {
+            $divide: ["$media_liga", 38],
+          },
+          19,
+        ],
+      },
+    },
+  },
+]
+
+
+--Query 11--
+[
+  {
+  $group: {
+    _id: null,
+    Barcelona_xg_partido: {
+      $sum: {
+        $cond: {
+          if: {
+              $eq: ["$club", "Barcelona"]
+          },
+          then: { $divide: ["$xg", 38] },
+          else: null
+        }
+      }
+    },
+    media_liga_xg_partido: {
+        $sum: {
+          $cond: {
+            if: {
+              $ne: ["$club", "Barcelona"],
+            },
+            then: "$xg",
+            else: null,
+          },
+        },
+      },
+      Barcelona_gol_partido: {
+      $sum: {
+        $cond: {
+          if: {
+              $eq: ["$club", "Barcelona"]
+          },
+          then: { $divide: ["$gol", 38] },
+          else: null
+        }
+      }
+    },
+    media_liga_gol_partido: {
+        $sum: {
+          $cond: {
+            if: {
+              $ne: ["$club", "Barcelona"],
+            },
+            then: "$gol",
+            else: null,
+          },
+        },
+      },
+    },
+  },
+  {
+    $project: {
+      _id: 0,
+      Barcelona_xg_partido: 1,
+      Barcelona_gol_partido: 1,
+      Barcelona_delantera: 1,
+      Media_liga_xg_partido: {
+        $divide: [
+          {
+            $divide: ["$media_liga_xg_partido", 38],
+          },
+          19,
+        ],
+      },
+      Media_liga_gol_partido: {
+        $divide: [
+          {
+            $divide: ["$media_liga_gol_partido", 38],
+          },
+          19,
+        ],
+      },
+    },
+  },
+]
+
+
+--Query 12--
+[
+  {
+    $group: {
+      _id: "$club",
+      total_intervenciones: {
+        $sum: {
+          $add: ["$bre", "$bds", "$bat"],
+        },
+      },
+    },
+  },
+  {
+    $sort: {
+      total_intervenciones: -1,
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      max_intervenciones_partido: {
+        $first: {
+          equipo: "$_id",
+          total: {
+            $divide: [
+              "$total_intervenciones",
+              38,
+            ],
+          },
+        },
+      },
+      min_intervenciones_partido: {
+        $last: {
+          equipo: "$_id",
+          total: {
+            $divide: [
+              "$total_intervenciones",
+              38,
+            ],
+          },
+        },
+      },
+      Barcelona: {
+        $sum: {
+          $cond: {
+            if: {
+              $eq: ["$_id", "Barcelona"],
+            },
+            then: {
+              $divide: [
+                "$total_intervenciones",
+                38,
+              ],
+            },
+            else: null,
+          },
+        },
+      },
+      media_liga: {
+        $avg: {
+          $cond: {
+            if: {
+              $ne: ["$_id", "Barcelona"],
+            },
+            then: {
+              $divide: [
+                "$total_intervenciones",
+                38,
+              ],
+            },
+            else: null,
+          },
+        },
+      },
+    },
+  },
+  {
+    $project: {
+      _id: 0,
+      max_intervenciones_partido: 1,
+      min_intervenciones_partido: 1,
+      media_liga: 1,
+      Barcelona: 1,
+    },
+  },
+]
+
+
+--Query 13--
+[
+  {
+    $match: {
+      $and: [
+        {
+          min: {
+            $gte: 1000,
+          },
+        },
+        {
+          posicion: "2Lateral",
+        },
+      ],
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      Kounde_pc_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Jules Koundé"],
+            },
+            then: "$ps_c/90",
+            else: null,
+          },
+        },
+      },
+      Alba_pc_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Jordi Alba"],
+            },
+            then: "$ps_c/90",
+            else: null,
+          },
+        },
+      },
+      media_liga_pc_90: {
+        $avg: {
+          $cond: [
+            {
+              $and: [
+                {
+                  $ne: ["$club", "Barcelona"],
+                },
+                {
+                  $eq: ["$posicion", "2Lateral"],
+                },
+              ],
+            },
+            "$ps_c/90",
+            null,
+          ],
+        },
+      },
+      Kounde_pclave_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Jules Koundé"],
+            },
+            then: "$pas_clv/90",
+            else: null,
+          },
+        },
+      },
+      Alba_pclave_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Jordi Alba"],
+            },
+            then: "$pas_clv/90",
+            else: null,
+          },
+        },
+      },
+      media_liga_pclave_90: {
+        $avg: {
+          $cond: [
+            {
+              $and: [
+                {
+                  $ne: ["$club", "Barcelona"],
+                },
+                {
+                  $eq: ["$posicion", "2Lateral"],
+                },
+              ],
+            },
+            "$pas_clv/90",
+            null,
+          ],
+        },
+      },
+    },
+  },
+]
+
+
+--Query 14--
+[
+  {
+    $match: {
+      $and: [
+        {
+          min: {
+            $gte: 1000,
+          },
+        },
+        {
+          $or: [
+            {
+              posicion: "4Mediocentro",
+            },
+            {
+              posicion: "5Mediapunta",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      Pedri_pc_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Pedri"],
+            },
+            then: "$ps_c/90",
+            else: null,
+          },
+        },
+      },
+      Kessie_pc_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Franck Kessié"],
+            },
+            then: "$ps_c/90",
+            else: null,
+          },
+        },
+      },
+      media_liga_pc_90: {
+        $avg: {
+          $cond: [
+            {
+              $and: [
+                {
+                  $ne: ["$club", "Barcelona"],
+                },
+                {
+                  $or: [
+                    {posicion: "4Mediocentro"},
+                    {posicion: "5Mediapunta"},
+                  ],
+                },
+              ],
+            },
+            "$ps_c/90",
+            null,
+          ],
+        },
+      },
+      Pedri_tir_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Pedri"],
+            },
+            then: "$tir/90",
+            else: null,
+          },
+        },
+      },
+      Kessie_tir_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Franck Kessié"],
+            },
+            then: "$tir/90",
+            else: null,
+          },
+        },
+      },
+      media_liga_tir_90: {
+        $avg: {
+          $cond: [
+            {
+              $and: [
+                {
+                  $ne: ["$club", "Barcelona"],
+                },
+                {
+                  $or: [
+                    {
+                      posicion: "4Mediocentro",
+                    },
+                    {
+                      posicion: "5Mediapunta",
+                    },
+                  ],
+                },
+              ],
+            },
+            "$tir/90",
+            null,
+          ],
+        },
+      },
+    },
+  },
+]
+
+
+--Query 15--
+[
+  {
+    $match: {
+      $and: [
+        {
+          min: {
+            $gte: 1000,
+          },
+        },
+        {
+          posicion: "6Extremo",
+        },
+      ],
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      Dembélé_pclave_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Ousmane Dembélé"],
+            },
+            then: "$pas_clv/90",
+            else: null,
+          },
+        },
+      },
+      Ansu_pclave_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Ansu Fati"],
+            },
+            then: "$pas_clv/90",
+            else: null,
+          },
+        },
+      },
+      media_liga_pclave_90: {
+        $avg: {
+          $cond: [
+            {
+              $and: [
+                {
+                  $ne: ["$club", "Barcelona"],
+                },
+                {
+                  posicion: "6Extremo",
+                },
+              ],
+            },
+            "$pas_clv/90",
+            null,
+          ],
+        },
+      },
+      Dembélé_ga_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Ousmane Dembélé"],
+            },
+            then: {
+              $sum: ["$asis/90", "$gol/90"],
+            },
+            else: null,
+          },
+        },
+      },
+      Ansu_ga_90: {
+        $avg: {
+          $cond: {
+            if: {
+              $eq: ["$nombre", "Ansu Fati"],
+            },
+            then: {
+              $sum: ["$asis/90", "$gol/90"],
+            },
+            else: null,
+          },
+        },
+      },
+      media_liga_ga_90: {
+        $avg: {
+          $cond: [
+            {
+              $and: [
+                {
+                  $ne: ["$club", "Barcelona"],
+                },
+                {
+                  posicion: "6Extremo",
+                },
+              ],
+            },
+            {
+              $sum: ["$asis/90", "$gol/90"],
+            },
+            null,
+          ],
+        },
+      },
+    },
+  },
+]
+
